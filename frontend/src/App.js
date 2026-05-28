@@ -8,7 +8,7 @@ import "./App.css";
 
 const getApiUrl = (endpoint) => {
   if (process.env.NODE_ENV === "production") {
-    return `/api/${endpoint}`;
+    return `/_/backend/${endpoint}`;
   }
   return `http://127.0.0.1:5000/${endpoint}`;
 };
