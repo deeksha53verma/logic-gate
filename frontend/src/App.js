@@ -6,6 +6,13 @@ import ExpressionTree from "./ExpressionTree";
 import ComplexityDashboard from "./ComplexityDashboard";
 import "./App.css";
 
+const getApiUrl = (endpoint) => {
+  if (process.env.NODE_ENV === "production") {
+    return `/api/${endpoint}`;
+  }
+  return `http://127.0.0.1:5000/${endpoint}`;
+};
+
 function App() {
   const [mode, setMode] = useState("TRUTH_TABLE"); // TRUTH_TABLE or REVERSE
   const [numVars, setNumVars] = useState(2);
@@ -49,7 +56,7 @@ function App() {
   const generateFromTable = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://127.0.0.1:5000/generate", {
+      const res = await fetch(getApiUrl("generate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ variables: vars, table: table }),
@@ -69,7 +76,7 @@ function App() {
   const generateFromExpression = async () => {
     setLoading(true);
     try {
-      const res1 = await fetch("http://127.0.0.1:5000/reverse", {
+      const res1 = await fetch(getApiUrl("reverse"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ expression: expressionInput, variables: vars }),
@@ -85,7 +92,7 @@ function App() {
       setTable(data1.table);
       
       // Auto-generate circuit
-      const res2 = await fetch("http://127.0.0.1:5000/generate", {
+      const res2 = await fetch(getApiUrl("generate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ variables: vars, table: data1.table }),

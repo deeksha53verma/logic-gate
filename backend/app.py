@@ -14,14 +14,17 @@ app = Flask(__name__)
 CORS(app)
 
 @app.route("/")
+@app.route("/api/")
 def home():
     return "Logic Gate Synthesizer Running!"
 
 @app.route("/test", methods=["GET"])
+@app.route("/api/test", methods=["GET"])
 def test():
     return jsonify({"message": "Backend working!"})
 
 @app.route("/generate", methods=["POST"])
+@app.route("/api/generate", methods=["POST"])
 def generate_expression():
     data = request.json
     variable_names = data["variables"]
@@ -167,6 +170,7 @@ def generate_expression():
 
 
 @app.route("/reverse", methods=["POST"])
+@app.route("/api/reverse", methods=["POST"])
 def reverse_expression():
     try:
         from sympy.parsing.sympy_parser import parse_expr
