@@ -37,9 +37,11 @@ const getLayoutedElements = (nodes, edges, direction = "LR") => {
   return { nodes, edges };
 };
 
-const getBackgroundColor = (type, state) => {
-  if (type === "INPUT" || type === "OUTPUT") return state ? "#4CAF50" : "#f44336"; // Green for 1, Red for 0
-  return "#2196F3"; // Blue for logic gates
+const getBackgroundColor = (type, isHigh) => {
+  if (type === "INPUT" || type === "OUTPUT") {
+    return isHigh ? "#4CAF50" : "#f44336"; // Green for 1, Red for 0
+  }
+  return isHigh ? "#2e7d32" : "#2196F3"; // Glowing green for high logic gates, blue for low logic gates
 };
 
 const CircuitDiagram = ({ circuit, simulationState }) => {
@@ -49,44 +51,119 @@ const CircuitDiagram = ({ circuit, simulationState }) => {
   useEffect(() => {
     if (!circuit || !circuit.nodes) return;
 
-    // Evaluate circuit state based on simulation inputs
     const evalState = { ...simulationState };
-    
-    // Simple topological evaluation simulator
     const tempNodes = [...circuit.nodes];
     const tempEdges = [...circuit.edges];
+
+    // Compute topological value for each node
+    const nodeValues = {};
     
-    // Sort logic gates roughly by edges to simulate
-    // In a real robust simulator, we'd do a proper topological sort.
-    // For visual simplicity, we assume we can just colorize the inputs and pass them.
+    const evaluateNode = (nodeId) => {
+      if (nodeId in nodeValues) return nodeValues[nodeId];
+      
+      const node = tempNodes.find(n => n.id === nodeId);
+      if (!node) return 0;
+      
+      if (node.type === "INPUT") {
+        let val = 0;
+        if (node.label === "True" || node.label === "1") {
+          val = 1;
+        } else if (node.label === "False" || node.label === "0") {
+          val = 0;
+        } else {
+          val = evalState[node.label] !== undefined ? evalState[node.label] : 0;
+        }
+        nodeValues[nodeId] = val;
+        return val;
+      }
+      
+      // Find incoming edges pointing to this node (its inputs)
+      const incoming = tempEdges.filter(e => e.target === nodeId);
+      const childValues = incoming.map(e => evaluateNode(e.source));
+      
+      let val = 0;
+      if (node.type === "NOT") {
+        val = childValues.length > 0 ? (childValues[0] === 1 ? 0 : 1) : 0;
+      } else if (node.type === "AND") {
+        val = childValues.length > 0 && childValues.every(v => v === 1) ? 1 : 0;
+      } else if (node.type === "OR") {
+        val = childValues.length > 0 && childValues.some(v => v === 1) ? 1 : 0;
+      } else if (node.type === "OUTPUT") {
+        val = childValues.length > 0 ? childValues[0] : 0;
+      }
+      
+      nodeValues[nodeId] = val;
+      return val;
+    };
+
+    // Evaluate all nodes in the circuit
+    tempNodes.forEach(n => evaluateNode(n.id));
 
     const initialNodes = tempNodes.map((n) => {
-      const isHigh = evalState[n.label] === 1;
+      const val = nodeValues[n.id];
+      const isHigh = val === 1;
+      const isCritical = n.critical === true;
+      
+      let displayLabel = n.label;
+      if (n.type === "INPUT") {
+        displayLabel = `${n.label} (${val})`;
+      } else if (n.type === "OUTPUT") {
+        displayLabel = `OUT (${val})`;
+      } else {
+        displayLabel = `${n.label} (${val})`;
+      }
+
       return {
         id: n.id,
         type: "default",
-        data: { label: `${n.label} ${n.type === "INPUT" ? (isHigh ? "(1)" : "(0)") : ""}` },
+        data: { label: displayLabel },
         style: {
-          background: getBackgroundColor(n.type, isHigh),
+          background: isCritical 
+            ? "linear-gradient(135deg, #e65100 0%, #ff5722 100%)" 
+            : getBackgroundColor(n.type, isHigh),
           color: "white",
           fontWeight: "bold",
           borderRadius: "8px",
-          border: "2px solid #222"
+          border: isCritical ? "3px solid #ff9800" : "2px solid #222",
+          boxShadow: isCritical 
+            ? "0 0 15px rgba(255, 87, 34, 0.8)" 
+            : isHigh 
+              ? "0 0 12px rgba(76, 175, 80, 0.6)" 
+              : "none",
+          transition: "all 0.3s ease"
         }
       };
     });
 
-    const initialEdges = tempEdges.map((e, idx) => ({
-      id: `e${idx}`,
-      source: e.source,
-      target: e.target,
-      animated: true,
-      style: { stroke: "#333", strokeWidth: 2 },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: "#333",
-      },
-    }));
+    const initialEdges = tempEdges.map((e, idx) => {
+      const isCritical = e.critical === true;
+      const val = nodeValues[e.source];
+      const isHigh = val === 1;
+
+      return {
+        id: `e${idx}`,
+        source: e.source,
+        target: e.target,
+        animated: isHigh, // Animate only if the wire carries a high logic level
+        style: { 
+          stroke: isCritical 
+            ? "#ff5722" 
+            : isHigh 
+              ? "#4CAF50" 
+              : "#78909c", 
+          strokeWidth: isCritical ? 3.5 : isHigh ? 2.5 : 1.5 
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: isCritical 
+            ? "#ff5722" 
+            : isHigh 
+              ? "#4CAF50" 
+              : "#78909c",
+        },
+      };
+    });
+
 
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
       initialNodes,

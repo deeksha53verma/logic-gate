@@ -1,8 +1,14 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from sympy import symbols
+from sympy import symbols, Or, And, Not, false, true
 from sympy.logic.boolalg import SOPform, POSform, simplify_logic
-from visualization.circuit_generator import generate_circuit_from_expr, get_circuit_analytics
+from visualization.circuit_generator import generate_circuit_from_expr, get_circuit_analytics, generate_expression_tree
+
+# Import new DAA Optimization components
+from simplifier.memoized_simplifier import MemoizedSimplifier
+from simplifier.greedy_kmap import solve_greedy_kmap
+from simulator.equivalence_verifier import verify_equivalence
+from optimizer.heuristic_engine import select_best_circuit
 
 app = Flask(__name__)
 CORS(app)
@@ -30,7 +36,7 @@ def generate_expression():
 
     n = len(syms)
     
-    # Get minterms where output is 1
+    # 1. Get minterms where output is 1
     minterms = []
     for i, output in enumerate(table):
         if output == 1:
@@ -39,12 +45,41 @@ def generate_expression():
             minterms.append(minterm)
 
     if not minterms:
-        return jsonify({"expression": "0"})
+        # Trivial Zero
+        naive_circuit = generate_circuit_from_expr(false)
 
-    # Generation using Sympy
-    from sympy import And, Or, Not
-    
-    # Generate Naive SOP manually (since SOPform auto-simplifies)
+        return jsonify({
+            "original_sop": "0",
+            "original_pos": "0",
+            "simplified": "0",
+            "factored_expr": "0",
+            "winner_name": "Trivial Zero",
+            "winner_expr": "0",
+            "naive_circuit": naive_circuit,
+            "optimized_circuit": naive_circuit,
+            "factored_circuit": naive_circuit,
+            "step_by_step": ["Step 1: The truth table output is always 0. No gates required."],
+            "analytics": {
+                "naive": {"gate_count": 0, "cost": 0, "depth": 0, "total_delay_ns": 0},
+                "optimized": {"gate_count": 0, "cost": 0, "depth": 0, "total_delay_ns": 0},
+                "winner": {"gate_count": 0, "cost": 0, "depth": 0, "total_delay_ns": 0},
+                "saved_gates": 0
+            },
+            "greedy_kmap_steps": [],
+            "equivalence": {"is_equivalent": True, "total_cases": 2**n, "mismatches": []},
+            "memoization_report": {"lookups": 0, "cache_hits": 0, "saved_operations": 0, "reduction_percentage": 0},
+            "bb_report": {"states_explored": 0, "states_pruned": 0},
+            "expression_tree": {"nodes": [{"id": "treenode_const", "type": "VARIABLE", "label": "0"}], "edges": []},
+            "heuristic_report": {
+                "winner_name": "Trivial Zero",
+                "winner_expr": "0",
+                "reason": "The truth table output is always 0. No gates are needed.",
+                "comparison": []
+            }
+        })
+
+
+    # 2. Build Naive SOP
     naive_terms = []
     for minterm in minterms:
         term_vars = []
@@ -55,43 +90,81 @@ def generate_expression():
                 term_vars.append(Not(syms[j]))
         naive_terms.append(And(*term_vars))
         
-    if naive_terms:
-        sop_expr = Or(*naive_terms)
-    else:
-        sop_expr = False
+    sop_expr = Or(*naive_terms)
 
+    # 3. Simplify with Dynamic Programming/Memoization
+    memo_simplifier = MemoizedSimplifier()
+    simplified_expr = memo_simplifier.simplify(sop_expr)
+    memo_stats = memo_simplifier.get_stats()
+
+    # 4. Generate SOP and POS using K-map (for analysis comparison)
     pos_expr = POSform(syms, minterms)
-    simplified_expr = simplify_logic(sop_expr)
 
-    # Circuit Generation
+    # 5. Run Heuristic Selection Engine (runs Algebraic, Branch & Bound, SOP, POS)
+    heuristic_results = select_best_circuit(table, variable_names)
+    
+    winner_expr_obj = heuristic_results["winner_expr_obj"]
+    winner_name = heuristic_results["winner_name"]
+    winner_expr_str = heuristic_results["winner_expr"]
+    
+    # 6. Circuits Generation
     naive_circuit = generate_circuit_from_expr(sop_expr)
     optimized_circuit = generate_circuit_from_expr(simplified_expr)
+    winner_circuit = heuristic_results["winner_circuit"]
 
-    # Analytics
+    # 7. Analytics
     naive_analytics = get_circuit_analytics(naive_circuit)
     optimized_analytics = get_circuit_analytics(optimized_circuit)
+    winner_analytics = get_circuit_analytics(winner_circuit)
 
-    # Step-by-Step Logic
+    # 8. Expression Tree Generation (optimized or winner tree)
+    tree_layout = generate_expression_tree(winner_expr_obj)
+
+    # 9. Equivalence Verification (Naive SOP vs Winner)
+    equiv_results = verify_equivalence(sop_expr, winner_expr_obj, variable_names)
+
+    # 10. Greedy K-map groupings
+    kmap_steps = solve_greedy_kmap(table, variable_names)
+
+    # Step-by-Step Logic description
     step_by_step = [
         f"Step 1: Identify minterms from Truth Table: {minterms}",
-        "Step 2: Apply Quine-McCluskey / K-Map grouping to find Prime Implicants.",
-        "Step 3: Eliminate redundant implicants to find Essential Prime Implicants.",
-        f"Step 4: Combine to form minimal expression: {str(simplified_expr)}"
+        f"Step 2: Apply Memoized Boolean Simplifier (DP) lookup. Lookups: {memo_stats['lookups']}, Hits: {memo_stats['cache_hits']}.",
+        f"Step 3: Run Heuristic Optimization Engine (SOP vs POS vs Factored).",
+        f"Step 4: Selected winner algorithm: '{winner_name}' based on Cost Score.",
+        f"Step 5: Perform exhaustive verification for equivalence: {equiv_results['is_equivalent']}."
     ]
 
     return jsonify({
         "original_sop": str(sop_expr),
         "original_pos": str(pos_expr),
         "simplified": str(simplified_expr),
+        "factored_expr": winner_expr_str,
+        "winner_name": winner_name,
+        "winner_expr": winner_expr_str,
         "naive_circuit": naive_circuit,
         "optimized_circuit": optimized_circuit,
+        "factored_circuit": winner_circuit,
         "step_by_step": step_by_step,
         "analytics": {
             "naive": naive_analytics,
             "optimized": optimized_analytics,
-            "saved_gates": naive_analytics["gate_count"] - optimized_analytics["gate_count"]
+            "winner": winner_analytics,
+            "saved_gates": naive_analytics["gate_count"] - winner_analytics["gate_count"]
+        },
+        "greedy_kmap_steps": kmap_steps,
+        "equivalence": equiv_results,
+        "memoization_report": memo_stats,
+        "bb_report": heuristic_results["bb_stats"],
+        "expression_tree": tree_layout,
+        "heuristic_report": {
+            "winner_name": winner_name,
+            "winner_expr": winner_expr_str,
+            "reason": heuristic_results["reason"],
+            "comparison": heuristic_results["comparison"]
         }
     })
+
 
 @app.route("/reverse", methods=["POST"])
 def reverse_expression():

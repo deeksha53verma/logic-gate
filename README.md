@@ -1,7 +1,6 @@
-# Logical Logic Gate Synthesizer
-
-A tool to convert truth tables into optimized logic circuits using DAA + DMS.
 # Logic Gate Synthesizer
+
+A tool to convert truth tables into optimized logic circuits using DAA techniques.
 
 ## 🚀 Features
 - Truth Table → Boolean Expression
