@@ -4,6 +4,7 @@ import CircuitDiagram from "./CircuitDiagram";
 import KMap from "./KMap";
 import ExpressionTree from "./ExpressionTree";
 import ComplexityDashboard from "./ComplexityDashboard";
+import DragDropCircuit from "./DragDropCircuit";
 import "./App.css";
 
 const getApiUrl = (endpoint) => {
@@ -18,7 +19,7 @@ function App() {
   const [numVars, setNumVars] = useState(2);
   const [table, setTable] = useState([0, 1, 1, 0]);
   const [expressionInput, setExpressionInput] = useState("");
-  const [activeTab, setActiveTab] = useState("DASHBOARD"); // DASHBOARD, CIRCUIT, TREE, KMAP
+  const [activeTab, setActiveTab] = useState("SANDBOX"); // SANDBOX, DASHBOARD, CIRCUIT, TREE, KMAP
   
   const [result, setResult] = useState(null);
   const [simulationState, setSimulationState] = useState({});
@@ -63,6 +64,7 @@ function App() {
       });
       const data = await res.json();
       setResult(data);
+      setActiveTab("DASHBOARD");
       
       const initState = {};
       vars.forEach(v => initState[v] = 0);
@@ -99,6 +101,7 @@ function App() {
       });
       const data2 = await res2.json();
       setResult(data2);
+      setActiveTab("DASHBOARD");
       
       const initState = {};
       vars.forEach(v => initState[v] = 0);
@@ -265,57 +268,77 @@ function App() {
       </div>
 
       {/* BOTTOM TABBED AREA: COMPREHENSIVE VIEWERS */}
-      {result && (
-        <div className="glass-panel" style={{ marginTop: "30px", padding: "20px" }}>
+      <div className="glass-panel" style={{ marginTop: "30px", padding: "20px" }}>
+        
+        {/* TABS HEADER */}
+        <div className="tabs-header">
+          <button 
+            className={`tab-btn ${activeTab === "SANDBOX" ? "active" : ""}`}
+            onClick={() => setActiveTab("SANDBOX")}
+          >
+            🛠️ Drag & Drop Sandbox
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === "DASHBOARD" ? "active" : ""}`}
+            onClick={() => { if (result) setActiveTab("DASHBOARD"); }}
+            style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}
+          >
+            📊 Complexity Dashboard
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === "CIRCUIT" ? "active" : ""}`}
+            onClick={() => { if (result) setActiveTab("CIRCUIT"); }}
+            style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}
+          >
+            🔌 Auto-Generated Circuit
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === "TREE" ? "active" : ""}`}
+            onClick={() => { if (result) setActiveTab("TREE"); }}
+            style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}
+          >
+            🌳 Expression Tree View
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === "KMAP" ? "active" : ""}`}
+            onClick={() => { if (result) setActiveTab("KMAP"); }}
+            style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}
+          >
+            🗺️ Greedy K-Map Steps
+          </button>
+        </div>
+
+        {/* TAB CONTENT */}
+        <div style={{ marginTop: "20px" }}>
           
-          {/* TABS HEADER */}
-          <div className="tabs-header">
-            <button 
-              className={`tab-btn ${activeTab === "DASHBOARD" ? "active" : ""}`}
-              onClick={() => setActiveTab("DASHBOARD")}
-            >
-              📊 Complexity Dashboard
-            </button>
-            <button 
-              className={`tab-btn ${activeTab === "CIRCUIT" ? "active" : ""}`}
-              onClick={() => setActiveTab("CIRCUIT")}
-            >
-              🔌 Interactive Circuit Sim
-            </button>
-            <button 
-              className={`tab-btn ${activeTab === "TREE" ? "active" : ""}`}
-              onClick={() => setActiveTab("TREE")}
-            >
-              🌳 Expression Tree View
-            </button>
-            <button 
-              className={`tab-btn ${activeTab === "KMAP" ? "active" : ""}`}
-              onClick={() => setActiveTab("KMAP")}
-            >
-              🗺️ Greedy K-Map Steps
-            </button>
-          </div>
+          {activeTab === "SANDBOX" && (
+            <DragDropCircuit />
+          )}
 
-          {/* TAB CONTENT */}
-          <div style={{ marginTop: "20px" }}>
-            
-            {activeTab === "DASHBOARD" && (
+          {activeTab === "DASHBOARD" && (
+            result ? (
               <ComplexityDashboard result={result} />
-            )}
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to unlock the complexity dashboard.
+              </div>
+            )
+          )}
 
-            {activeTab === "CIRCUIT" && (
+          {activeTab === "CIRCUIT" && (
+            result ? (
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
                   <div>
                     <h3 style={{ margin: 0 }}>Interactive Circuit Simulation (with Critical Path Highlight)</h3>
-                    <p style={{ margin: "3px 0 0 0", fontSize: "0.85rem", color: "#666" }}>
+                    <p style={{ margin: "3px 0 0 0", fontSize: "0.85rem", color: "#94a3b8" }}>
                       Toggle inputs to simulate behavior. Glowing orange path shows the critical path (longest delay path).
                     </p>
                   </div>
                   <button className="btn btn-success" onClick={exportCircuit}>📸 Export Schematics</button>
                 </div>
                 
-                <div style={{ marginBottom: "20px", background: "rgba(0,0,0,0.03)", padding: "12px", borderRadius: "8px", display: "inline-block" }}>
+                <div style={{ marginBottom: "20px", background: "rgba(255,255,255,0.03)", padding: "12px", borderRadius: "8px", display: "inline-block", border: "1px solid rgba(255,255,255,0.05)" }}>
                   <strong>Toggle Inputs: </strong>
                   {vars.map(v => (
                     <button 
@@ -329,30 +352,42 @@ function App() {
                   ))}
                 </div>
 
-                <div ref={circuitRef} style={{ display: "flex", gap: "25px", flexWrap: "wrap", background: "#fff", padding: "20px", borderRadius: "10px", border: "1px solid #ddd" }}>
+                <div ref={circuitRef} style={{ display: "flex", gap: "25px", flexWrap: "wrap", background: "#020617", padding: "20px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.1)" }}>
                   <div style={{ flex: 1, minWidth: "300px" }}>
-                    <h3 style={{ textAlign: "center", color: "#d32f2f", margin: "0 0 15px 0" }}>Naive SOP Circuit</h3>
+                    <h3 style={{ textAlign: "center", color: "#f43f5e", margin: "0 0 15px 0" }}>Naive SOP Circuit</h3>
                     <CircuitDiagram circuit={result.naive_circuit} simulationState={simulationState} />
                   </div>
                   <div style={{ flex: 1, minWidth: "300px" }}>
-                    <h3 style={{ textAlign: "center", color: "#2e7d32", margin: "0 0 15px 0" }}>Heuristic Winner ({result.winner_name})</h3>
+                    <h3 style={{ textAlign: "center", color: "#10b981", margin: "0 0 15px 0" }}>Heuristic Winner ({result.winner_name})</h3>
                     <CircuitDiagram circuit={result.factored_circuit} simulationState={simulationState} />
                   </div>
                 </div>
               </div>
-            )}
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to auto-generate interactive circuits.
+              </div>
+            )
+          )}
 
-            {activeTab === "TREE" && (
+          {activeTab === "TREE" && (
+            result ? (
               <div>
                 <h3>Logical Expression AST Structure</h3>
-                <p style={{ fontSize: "0.85rem", color: "#666", marginBottom: "15px" }}>
+                <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginBottom: "15px" }}>
                   A pure expression tree layout. Sub-operations represent subtrees, and leaves represent literal variables.
                 </p>
                 <ExpressionTree treeData={result.expression_tree} simulationState={simulationState} />
               </div>
-            )}
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to view the expression tree structure.
+              </div>
+            )
+          )}
 
-            {activeTab === "KMAP" && (
+          {activeTab === "KMAP" && (
+            result ? (
               <div>
                 <KMap 
                   numVars={numVars} 
@@ -361,12 +396,17 @@ function App() {
                   greedyKmapSteps={result.greedy_kmap_steps} 
                 />
               </div>
-            )}
-
-          </div>
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to view greedy K-Map groupings.
+              </div>
+            )
+          )}
 
         </div>
-      )}
+
+      </div>
+
 
     </div>
   );
