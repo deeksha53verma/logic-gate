@@ -135,10 +135,17 @@ function App() {
 
   const vars = getVarNames(numVars);
 
+  const getDefaultTable = (n) => {
+    if (n === 2) return [0, 1, 1, 0];
+    if (n === 3) return [0, 1, 1, 0, 1, 0, 0, 1];
+    if (n === 4) return [0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0];
+    return new Array(Math.pow(2, n)).fill(0);
+  };
+
   const handleNumVarsChange = (e) => {
     const n = parseInt(e.target.value);
     setNumVars(n);
-    setTable(new Array(Math.pow(2, n)).fill(0));
+    setTable(getDefaultTable(n));
     setResult(null);
     setSimulationState({});
   };

@@ -42,7 +42,7 @@ def generate_expression():
     # 1. Get minterms where output is 1
     minterms = []
     for i, output in enumerate(table):
-        if output == 1:
+        if int(output) == 1:
             binary = format(i, f'0{n}b')
             minterm = [int(b) for b in binary]
             minterms.append(minterm)

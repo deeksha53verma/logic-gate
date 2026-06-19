@@ -37,7 +37,7 @@ def select_best_circuit(table, variables):
     n = len(syms)
     
     # 1. Get minterms
-    minterms = [i for i, val in enumerate(table) if val == 1]
+    minterms = [i for i, val in enumerate(table) if int(val) == 1]
     if not minterms:
         # Trivial 0 circuit
         winner_expr = false
