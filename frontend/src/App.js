@@ -1,11 +1,38 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import * as htmlToImage from "html-to-image";
 import CircuitDiagram from "./CircuitDiagram";
 import KMap from "./KMap";
 import ExpressionTree from "./ExpressionTree";
-import ComplexityDashboard from "./ComplexityDashboard";
 import DragDropCircuit from "./DragDropCircuit";
 import "./App.css";
+
+// Engines & Algorithms
+import { generateAllImplementations } from "./mapping-engine/icMappingEngine";
+import { compareCosts } from "./cost-engine/costEngine";
+import { calculateTransparentScore } from "./heuristics/heuristicScorer";
+import { optimizeWithDP } from "./algorithms/dpSubcircuitOptimizer";
+import { greedyPackGates } from "./algorithms/greedyICPacker";
+import { branchAndBoundICSearch } from "./algorithms/branchAndBoundIC";
+import { transformExpression } from "./algorithms/transformAndConquer";
+import { backtrackingPlace } from "./algorithms/backtrackingPlacer";
+import { analyzeCircuitDAG } from "./algorithms/graphOptimizer";
+import { optimizePlacement } from "./algorithms/placementOptimizer";
+
+// React UI Panels
+import ICLibraryPanel from "./components/ICLibraryPanel";
+import ICMappingPanel from "./components/ICMappingPanel";
+import ImplementationComparison from "./components/ImplementationComparison";
+import CostAnalysisPanel from "./components/CostAnalysisPanel";
+import HeuristicBreakdownPanel from "./components/HeuristicBreakdownPanel";
+import AlgorithmExplainerPanel from "./components/AlgorithmExplainerPanel";
+import PCBPlacementPanel from "./components/PCBPlacementPanel";
+import PropagationDelayPanel from "./components/PropagationDelayPanel";
+import FanInFanOutPanel from "./components/FanInFanOutPanel";
+import PowerEstimationPanel from "./components/PowerEstimationPanel";
+import PCBResourcePanel from "./components/PCBResourcePanel";
+import BenchmarkPanel from "./components/BenchmarkPanel";
+import EngineeringReport from "./components/EngineeringReport";
+import EnhancedDashboard from "./components/EnhancedDashboard";
 
 const getApiUrl = (endpoint) => {
   if (process.env.NODE_ENV === "production") {
@@ -26,6 +53,81 @@ function App() {
   const [loading, setLoading] = useState(false);
 
   const circuitRef = useRef(null);
+
+  // EDA Engine State variables
+  const [implementations, setImplementations] = useState([]);
+  const [costs, setCosts] = useState([]);
+  const [heuristicScores, setHeuristicScores] = useState([]);
+  const [graphResult, setGraphResult] = useState(null);
+  const [placementResult, setPlacementResult] = useState(null);
+
+  // Playback Step States for DAA explainer
+  const [dpResult, setDpResult] = useState(null);
+  const [greedyResult, setGreedyResult] = useState(null);
+  const [bbResult, setBbResult] = useState(null);
+  const [transformResult, setTransformResult] = useState(null);
+  const [backtrackResult, setBacktrackResult] = useState(null);
+
+  // EDA simulation engine effect hook
+  useEffect(() => {
+    if (!result || !result.factored_circuit) return;
+
+    try {
+      const circuit = result.factored_circuit;
+
+      // 1. Map gates to physical 7400 ICs
+      const impls = generateAllImplementations(circuit);
+      setImplementations(impls);
+
+      // 2. Compute cost breakdowns
+      const costComps = compareCosts(impls);
+      setCosts(costComps);
+
+      // 3. Analyze graph DAG structures
+      const graph = analyzeCircuitDAG(circuit);
+      setGraphResult(graph);
+
+      // 4. Place IC packages on simulated PCB board
+      const bestImpl = impls.find(i => i.label === 'Mixed Optimal') || impls[0];
+      if (bestImpl && bestImpl.ics) {
+        const placement = optimizePlacement(bestImpl.ics);
+        setPlacementResult(placement);
+      }
+
+      // 5. Run DAA algorithms to extract step-by-step logs
+      const dp = optimizeWithDP(circuit);
+      setDpResult(dp);
+
+      const greedy = greedyPackGates(circuit);
+      setGreedyResult(greedy);
+
+      const bb = branchAndBoundICSearch(circuit);
+      setBbResult(bb);
+
+      const transform = transformExpression(result.expression || 'A*B + A*C');
+      setTransformResult(transform);
+
+      const backtrack = backtrackingPlace(circuit);
+      setBacktrackResult(backtrack);
+
+      // 6. Multi-criteria heuristic scoring
+      const candidates = impls.map(impl => {
+        return {
+          name: impl.label,
+          gateCount: impl.totalGates,
+          delay: impl.totalDelay,
+          icCost: impl.chipCost,
+          power: impl.totalPower,
+          routingComplexity: impl.wiringComplexity
+        };
+      });
+      const scoredCandidates = calculateTransparentScore(candidates);
+      setHeuristicScores(scoredCandidates);
+
+    } catch (err) {
+      console.error("Error executing simulation engines:", err);
+    }
+  }, [result]);
 
   const getVarNames = (n) => {
     return Array.from({ length: n }, (_, i) => String.fromCharCode(65 + i));
@@ -269,43 +371,85 @@ function App() {
 
       {/* BOTTOM TABBED AREA: COMPREHENSIVE VIEWERS */}
       <div className="glass-panel" style={{ marginTop: "30px", padding: "20px" }}>
-        
-        {/* TABS HEADER */}
-        <div className="tabs-header">
-          <button 
-            className={`tab-btn ${activeTab === "SANDBOX" ? "active" : ""}`}
-            onClick={() => setActiveTab("SANDBOX")}
-          >
-            🛠️ Drag & Drop Sandbox
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === "DASHBOARD" ? "active" : ""}`}
-            onClick={() => { if (result) setActiveTab("DASHBOARD"); }}
-            style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}
-          >
-            📊 Complexity Dashboard
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === "CIRCUIT" ? "active" : ""}`}
-            onClick={() => { if (result) setActiveTab("CIRCUIT"); }}
-            style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}
-          >
-            🔌 Auto-Generated Circuit
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === "TREE" ? "active" : ""}`}
-            onClick={() => { if (result) setActiveTab("TREE"); }}
-            style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}
-          >
-            🌳 Expression Tree View
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === "KMAP" ? "active" : ""}`}
-            onClick={() => { if (result) setActiveTab("KMAP"); }}
-            style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}
-          >
-            🗺️ Greedy K-Map Steps
-          </button>
+           {/* TABS HEADER */}
+        <div style={{ marginBottom: "20px", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: "12px" }}>
+          <div style={{ fontSize: "11px", color: "#06b6d4", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px", fontWeight: 700 }}>
+            ⚡ 1. Core Synthesizer & AST
+          </div>
+          <div className="tabs-header" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "14px" }}>
+            <button className={`tab-btn ${activeTab === "SANDBOX" ? "active" : ""}`} onClick={() => setActiveTab("SANDBOX")}>
+              🛠️ Drag & Drop Sandbox
+            </button>
+            <button className={`tab-btn ${activeTab === "DASHBOARD" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("DASHBOARD"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              📊 Complexity Dashboard
+            </button>
+            <button className={`tab-btn ${activeTab === "CIRCUIT" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("CIRCUIT"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              🔌 Auto-Generated Circuit
+            </button>
+            <button className={`tab-btn ${activeTab === "TREE" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("TREE"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              🌳 Expression Tree View
+            </button>
+            <button className={`tab-btn ${activeTab === "KMAP" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("KMAP"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              🗺️ Greedy K-Map Steps
+            </button>
+          </div>
+
+          <div style={{ fontSize: "11px", color: "#a855f7", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px", fontWeight: 700 }}>
+            🎛️ 2. IC Mapping & Cost Optimization
+          </div>
+          <div className="tabs-header" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "14px" }}>
+            <button className={`tab-btn ${activeTab === "LIBRARY" ? "active" : ""}`} onClick={() => setActiveTab("LIBRARY")}>
+              📚 IC Library (7400 Series)
+            </button>
+            <button className={`tab-btn ${activeTab === "MAPPING" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("MAPPING"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              📦 Physical IC Mapping
+            </button>
+            <button className={`tab-btn ${activeTab === "COMPARISON" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("COMPARISON"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              📊 Strategy Comparison
+            </button>
+            <button className={`tab-btn ${activeTab === "COST" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("COST"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              💰 Cost Breakdown
+            </button>
+            <button className={`tab-btn ${activeTab === "HEURISTIC" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("HEURISTIC"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              🧠 Decision Scorecard
+            </button>
+          </div>
+
+          <div style={{ fontSize: "11px", color: "#10b981", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px", fontWeight: 700 }}>
+            📐 3. Timing, Power & PCB Layout
+          </div>
+          <div className="tabs-header" style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "14px" }}>
+            <button className={`tab-btn ${activeTab === "ALGORITHMS" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("ALGORITHMS"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              🎛️ Playback Explainer
+            </button>
+            <button className={`tab-btn ${activeTab === "TIMING" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("TIMING"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              ⚡ Timing & Critical Path
+            </button>
+            <button className={`tab-btn ${activeTab === "LOAD" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("LOAD"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              📈 Fan-In / Fan-Out
+            </button>
+            <button className={`tab-btn ${activeTab === "PCB" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("PCB"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              📐 PCB Placement Sim
+            </button>
+            <button className={`tab-btn ${activeTab === "POWER" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("POWER"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              🔋 Power Estimation
+            </button>
+            <button className={`tab-btn ${activeTab === "RESOURCES" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("RESOURCES"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              🔌 PCB Resources
+            </button>
+          </div>
+
+          <div style={{ fontSize: "11px", color: "#f59e0b", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px", fontWeight: 700 }}>
+            🏆 4. Performance Profiler & Report
+          </div>
+          <div className="tabs-header" style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            <button className={`tab-btn ${activeTab === "BENCHMARK" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("BENCHMARK"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              ⏱️ DAA Benchmarks
+            </button>
+            <button className={`tab-btn ${activeTab === "REPORT" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("REPORT"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
+              📋 EDA Engineering Report
+            </button>
+          </div>
         </div>
 
         {/* TAB CONTENT */}
@@ -317,7 +461,12 @@ function App() {
 
           {activeTab === "DASHBOARD" && (
             result ? (
-              <ComplexityDashboard result={result} />
+              <EnhancedDashboard
+                result={result}
+                implementations={implementations}
+                costs={costs}
+                heuristicScores={heuristicScores}
+              />
             ) : (
               <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
                 Please configure and run the optimization engine above to unlock the complexity dashboard.
@@ -403,11 +552,145 @@ function App() {
             )
           )}
 
+          {activeTab === "LIBRARY" && (
+            <ICLibraryPanel />
+          )}
+
+          {activeTab === "MAPPING" && (
+            result ? (
+              <ICMappingPanel circuit={result.factored_circuit} result={result} />
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to view physical IC mappings.
+              </div>
+            )
+          )}
+
+          {activeTab === "COMPARISON" && (
+            result ? (
+              <ImplementationComparison implementations={implementations} />
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to view implementation strategy comparisons.
+              </div>
+            )
+          )}
+
+          {activeTab === "COST" && (
+            result ? (
+              <CostAnalysisPanel implementations={implementations} />
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to view manufacturing cost breakdowns.
+              </div>
+            )
+          )}
+
+          {activeTab === "HEURISTIC" && (
+            result ? (
+              <HeuristicBreakdownPanel candidates={heuristicScores} />
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to view heuristic ranking details.
+              </div>
+            )
+          )}
+
+          {activeTab === "ALGORITHMS" && (
+            result ? (
+              <AlgorithmExplainerPanel
+                dpResult={dpResult}
+                greedyResult={greedyResult}
+                bbResult={bbResult}
+                transformResult={transformResult}
+                backtrackResult={backtrackResult}
+                graphResult={graphResult}
+              />
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to view algorithm execution playbacks.
+              </div>
+            )
+          )}
+
+          {activeTab === "TIMING" && (
+            result ? (
+              <PropagationDelayPanel graphResult={graphResult} />
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to view critical path delays.
+              </div>
+            )
+          )}
+
+          {activeTab === "LOAD" && (
+            graphResult ? (
+              <FanInFanOutPanel fanAnalysis={graphResult.fanAnalysis} />
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to view logic node fan-out loads.
+              </div>
+            )
+          )}
+
+          {activeTab === "PCB" && (
+            result ? (
+              <PCBPlacementPanel placementResult={placementResult} />
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to view simulated PCB chip placement.
+              </div>
+            )
+          )}
+
+          {activeTab === "POWER" && (
+            result ? (
+              <PowerEstimationPanel implementations={implementations} />
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to view power dissipation estimates.
+              </div>
+            )
+          )}
+
+          {activeTab === "RESOURCES" && (
+            result ? (
+              <PCBResourcePanel implementations={implementations} />
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to view PCB resource estimates.
+              </div>
+            )
+          )}
+
+          {activeTab === "BENCHMARK" && (
+            result ? (
+              <BenchmarkPanel result={result} circuit={result.factored_circuit} />
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to unlock the performance benchmark profiler.
+              </div>
+            )
+          )}
+
+          {activeTab === "REPORT" && (
+            result ? (
+              <EngineeringReport
+                result={result}
+                implementations={implementations}
+                costs={costs}
+                heuristicScores={heuristicScores}
+                graphResult={graphResult}
+              />
+            ) : (
+              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                Please configure and run the optimization engine above to view the complete EDA engineering report.
+              </div>
+            )
+          )}
+
         </div>
-
       </div>
-
-
     </div>
   );
 }
