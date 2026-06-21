@@ -55,7 +55,7 @@ def solve_greedy_kmap(table, variables):
         return []
 
     R, C, rows, cols = get_kmap_dimensions(num_vars)
-    minterms = [i for i, val in enumerate(table) if val == 1]
+    minterms = [i for i, val in enumerate(table) if int(val) == 1]
     
     if not minterms:
         return []
@@ -102,7 +102,7 @@ def solve_greedy_kmap(table, variables):
         for (r, c) in g:
             idx = cell_to_index(r, c, num_vars, rows, cols)
             g_indices.append(idx)
-            if table[idx] != 1:
+            if int(table[idx]) != 1:
                 all_ones = False
                 break
         if all_ones:
