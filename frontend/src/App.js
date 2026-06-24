@@ -23,7 +23,6 @@ import ICLibraryPanel from "./components/ICLibraryPanel";
 import ICMappingPanel from "./components/ICMappingPanel";
 import ImplementationComparison from "./components/ImplementationComparison";
 import CostAnalysisPanel from "./components/CostAnalysisPanel";
-import HeuristicBreakdownPanel from "./components/HeuristicBreakdownPanel";
 import AlgorithmExplainerPanel from "./components/AlgorithmExplainerPanel";
 import PCBPlacementPanel from "./components/PCBPlacementPanel";
 import PropagationDelayPanel from "./components/PropagationDelayPanel";
@@ -417,9 +416,6 @@ function App() {
             <button className={`tab-btn ${activeTab === "COST" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("COST"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
               💰 Cost Breakdown
             </button>
-            <button className={`tab-btn ${activeTab === "HEURISTIC" ? "active" : ""}`} onClick={() => { if (result) setActiveTab("HEURISTIC"); }} style={{ opacity: result ? 1 : 0.5, cursor: result ? "pointer" : "not-allowed" }}>
-              🧠 Decision Scorecard
-            </button>
           </div>
 
           <div style={{ fontSize: "11px", color: "#10b981", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px", fontWeight: 700 }}>
@@ -593,15 +589,7 @@ function App() {
             )
           )}
 
-          {activeTab === "HEURISTIC" && (
-            result ? (
-              <HeuristicBreakdownPanel candidates={heuristicScores} />
-            ) : (
-              <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
-                Please configure and run the optimization engine above to view heuristic ranking details.
-              </div>
-            )
-          )}
+
 
           {activeTab === "ALGORITHMS" && (
             result ? (
